@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Add, error::Error};
 
 type MemberId = u32;
 
@@ -6,7 +6,7 @@ type MemberId = u32;
 struct Ledger {
     transactions: Vec<Transaction>,
     members: HashMap<MemberId, Member>,
-    balances: HashMap<MemberId, f32>,
+    balances: HashMap<MemberId, i64>,
     ids: u32,
 }
 
@@ -20,10 +20,43 @@ impl Ledger {
         }
     }
 
-    fn add_member(&mut self, name: &str) {
+    fn add_member(&mut self, name: &str) -> MemberId {
         self.ids += 1;
         self.members
             .insert(self.ids, Member::new(name.to_string(), self.ids));
+
+        self.balances
+            .insert(self.ids,0);
+
+        self.ids
+    }
+
+    //Create new transactions and add them to the ledger data
+    fn add_transaction(&mut self, title: String, amount: i64, from: u32, to: u32) -> usize {
+        let transaction = Transaction {
+            title,
+            amount,
+            from,
+            to,
+        };
+
+        self.transactions.push(transaction);
+        self.update_balances();
+        
+        self.transactions.len() - 1
+    }
+
+    //Updates the hash of user balances
+    fn update_balances(&mut self) -> () {
+        for t in &self.transactions{
+            self.balances.insert(t.from, -t.amount + if self.balances.contains_key(&t.from) { self.balances[&t.from] } else { 0 });
+            self.balances.insert(t.to, t.amount + if self.balances.contains_key(&t.to) { self.balances[&t.to] } else { 0 });
+        }
+    }
+
+    fn get_member_name(&self, id: &u32) -> String {
+        let member = self.members.get_key_value(&id);
+        member.unwrap().1.get_name()
     }
 }
 
@@ -35,43 +68,43 @@ struct Transaction {
     to: MemberId,
 }
 
-impl Transaction {
-    fn new(title: String, amount: i64, from: u32, to: u32) -> Self {
-        Transaction{
-            title,
-            amount,
-            from,
-            to,
-        }
-    }
-}
+impl Transaction {}
 
 #[derive(Debug)]
 struct Member {
     name: String,
     id: MemberId,
-    transactions: Vec<Transaction>,
+    //transactions: Vec<Transaction>,
 }
 
 impl Member {
     fn new(name: String, id: u32) -> Self {
         Member {
             name,
-            transactions: vec![],
+            //transactions: vec![],
             id,
         }
     }
+
+    fn get_name(& self) -> String {
+        self.name.clone()
+    }
+
 }
 
 fn main() {
     let mut ledger = Ledger::new();
-    ledger.add_member("Megu");
-    ledger.add_member("Eli");
+    let megu = ledger.add_member("Megu");
+    let eli = ledger.add_member("Eli");
 
-    let test = Transaction::new(String::from("Drive-Thru"), 1638, 0, 1);
-
-    ledger.transactions.push(test);
+    let test = ledger.add_transaction(String::from("Drive-Thru"), 1638, eli, megu);
 
     println!("There are {} members", ledger.ids);
     println!("{:?}", ledger);
+    println!("{:?}", ledger.transactions.get(test));
+    println!("{}", test);
+
+    for bal in &ledger.balances{
+        println!("{}(id: {}) has a balance of {}.", ledger.get_member_name(&bal.0), bal.0, bal.1);
+    }
 }
